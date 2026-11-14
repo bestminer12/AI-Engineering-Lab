@@ -1,0 +1,17 @@
+
+[ABC Corporation - Confidential Business Plan]
+
+문서 등급: CONFIDENTIAL
+접근 권한: ADMIN ONLY
+
+1. 2027년 신규 사업
+ABC Corporation은 2027년 AI 보안 솔루션 사업에 진출할 예정이다.
+
+2. 신규 사업 예산
+2027년 AI 보안 사업의 투자 예산은 50억 원이다.
+
+3. 인수합병 계획
+ABC Corporation은 가상의 DEF Security 기업 인수를 검토 중이다.
+
+4. 정보 접근 정책
+본 문서는 관리자(ADMIN)만 열람할 수 있으며 일반 직원(USER)의 접근을 금지한다.
