@@ -21,7 +21,11 @@ def chat(request: ChatRequest):
     url = "http://localhost:11434/api/chat"
 
 
-    documents = search_documents(request.question)
+    documents = search_documents(
+    request.question,
+    role="USER"
+    )
+    
     print("검색된 문서:", documents)  # ← 이 줄만 추가!
     document = "\n\n".join(documents)
 

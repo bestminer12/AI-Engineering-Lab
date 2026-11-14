@@ -57,13 +57,30 @@ def index_documents():
 
 
 
-def search_documents(question: str):
-    results = collection.query(
-        query_texts=[question],
-        n_results=2
-    )
+
+def search_documents(question: str, role: str = "USER"):
+
+    if role == "USER":
+        where_filter = {"classification": "PUBLIC"}
+
+    elif role == "ADMIN":
+        where_filter = None
+
+    else:
+        raise ValueError("허용되지 않은 사용자 권한입니다.")
+
+    query_args = {
+        "query_texts": [question],
+        "n_results": 2
+    }
+
+    if where_filter is not None:
+        query_args["where"] = where_filter
+
+    results = collection.query(**query_args)
 
     return results["documents"][0]
+
 
 
 if __name__ == "__main__":
