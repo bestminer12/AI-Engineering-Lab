@@ -1,8 +1,8 @@
-
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends
 from pydantic import BaseModel
 import requests
 from app.vector_store import search_documents
+from app.auth import get_current_user
 
 app = FastAPI(title="GenAI Security Assessment Lab")
 
@@ -17,15 +17,18 @@ def home():
 
 
 @app.post("/chat")
-def chat(request: ChatRequest):
+def chat(
+    request: ChatRequest,
+    current_user: dict = Depends(get_current_user)
+    ):
     url = "http://localhost:11434/api/chat"
 
 
     documents = search_documents(
     request.question,
-    role="USER"
-    )
-    
+    role=current_user["role"]
+    )   
+
     print("검색된 문서:", documents)  # ← 이 줄만 추가!
     document = "\n\n".join(documents)
 
