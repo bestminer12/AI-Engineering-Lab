@@ -24,11 +24,12 @@ collection = client.get_or_create_collection(
 
 def index_documents():
     files = [
-        ("security_policy.txt", "PUBLIC"),
-        ("confidential_plan.txt", "CONFIDENTIAL")
+        ("security_policy.txt", "PUBLIC", True),
+        ("confidential_plan.txt", "CONFIDENTIAL", True),
+        ("malicious_notice.txt", "PUBLIC", False)
     ]
 
-    for filename, classification in files:
+    for filename, classification, trusted in files:
         path = BASE_DIR / "data" / filename
         text = path.read_text(encoding="utf-8")
 
@@ -39,6 +40,8 @@ def index_documents():
         ]
 
         collection.upsert(
+            
+
             ids=[
                 f"{filename}_{i}"
                 for i in range(len(sections))
@@ -47,7 +50,8 @@ def index_documents():
             metadatas=[
                 {
                     "classification": classification,
-                    "source": filename
+                    "source": filename,
+                    "trusted": trusted
                 }
                 for _ in sections
             ]
@@ -61,17 +65,22 @@ def index_documents():
 def search_documents(question: str, role: str = "USER"):
 
     if role == "USER":
-        where_filter = {"classification": "PUBLIC"}
+        where_filter = {
+            "$and": [
+                {"classification": {"$eq": "PUBLIC"}},
+                {"trusted": {"$eq": True}}
+            ]
+        }
 
     elif role == "ADMIN":
-        where_filter = None
+        where_filter = {"trusted": {"$eq": True}}
 
     else:
-        raise ValueError("허용되지 않은 사용자 권한입니다.")
+        raise ValueError("Invalid role")
 
     query_args = {
         "query_texts": [question],
-        "n_results": 2
+        "n_results": 5
     }
 
     if where_filter is not None:
