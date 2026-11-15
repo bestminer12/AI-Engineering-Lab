@@ -7,6 +7,9 @@ from fastapi.security import APIKeyHeader
 from dotenv import load_dotenv
 from app.security_logger import logger
 
+from fastapi import Request
+from app.detection import record_auth_failure
+
 load_dotenv()
 
 
@@ -18,6 +21,7 @@ api_key_header = APIKeyHeader(
 
 
 def get_current_user(
+    request: Request,
     api_key: str | None = Security(api_key_header)
 ):
     user_key = os.getenv("USER_API_KEY")
@@ -32,9 +36,21 @@ def get_current_user(
             detail="Authentication is not configured"
         )
 
+    # 클라이언트 IP 확인
+    client_ip = (
+        request.client.host
+        if request.client
+        else "unknown"
+    )
+
     # 2. API Key 누락
     if api_key is None:
-        logger.warning("AUTH_FAILURE reason=MISSING_API_KEY")
+        logger.warning(
+            "AUTH_FAILURE reason=MISSING_API_KEY"
+        )
+
+        # 인증 실패 횟수 기록
+        record_auth_failure(client_ip)
 
         raise HTTPException(
             status_code=401,
@@ -60,9 +76,16 @@ def get_current_user(
         }
 
     # 5. 잘못된 API Key
-    logger.warning("AUTH_FAILURE reason=INVALID_API_KEY")
+    logger.warning(
+        "AUTH_FAILURE reason=INVALID_API_KEY"
+    )
+
+    # 인증 실패 횟수 기록
+    record_auth_failure(client_ip)
 
     raise HTTPException(
         status_code=401,
         detail="Invalid API key"
     )
+
+
