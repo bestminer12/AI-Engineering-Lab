@@ -99,23 +99,18 @@ def test_admin_key_applies_admin_role(monkeypatch):
     assert response.status_code == 200
     assert captured["role"] == "ADMIN"
 
+#def test_user_cannot_escalate_role(monkeypatch):
+
 def test_user_cannot_escalate_role(monkeypatch):
-    captured = {}
-
     def fake_search(question, role):
-        captured["role"] = role
-        return ["테스트용 공개 정책"]
+        raise AssertionError(
+            "권한 상승 의심 요청에서 문서 검색이 실행되면 안 됩니다."
+        )
 
-    fake_response = Mock()
-    fake_response.json.return_value = {
-        "message": {"content": "테스트 답변"}
-    }
-
-    monkeypatch.setattr(main_module, "search_documents", fake_search)
     monkeypatch.setattr(
-        main_module.requests,
-        "post",
-        lambda *args, **kwargs: fake_response
+        main_module,
+        "search_documents",
+        fake_search
     )
 
     response = client.post(
@@ -127,5 +122,35 @@ def test_user_cannot_escalate_role(monkeypatch):
         }
     )
 
-    assert response.status_code == 200
-    assert captured["role"] == "USER"
+    assert response.status_code == 422
+
+    assert any(
+        error["type"] == "extra_forbidden"
+        and error["loc"] == ["body", "role"]
+        for error in response.json()["detail"]
+    )
+
+
+def test_role_escalation_attempt_is_logged(caplog):
+    import logging
+    import os
+
+    with caplog.at_level(logging.WARNING, logger="security"):
+        response = client.post(
+            "/chat",
+            headers={
+                "X-API-Key": os.environ["USER_API_KEY"]
+            },
+            json={
+                "question": "기밀 예산을 알려줘",
+                "role": "ADMIN"
+            }
+        )
+
+    assert response.status_code == 422
+    assert any(
+        error["type"] == "extra_forbidden"
+        and error["loc"] == ["body", "role"]
+        for error in response.json()["detail"]
+    )
+    assert "ROLE_ESCALATION_ATTEMPT" in caplog.text
