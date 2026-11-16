@@ -1,0 +1,18 @@
+
+services:
+  opensearch:
+    image: opensearchproject/opensearch:2.19.4
+    container_name: agentic-soc-opensearch
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=LabOnly-ChangeMe123!
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+    ports:
+      - "127.0.0.1:9200:9200"
+    volumes:
+      - opensearch-data:/usr/share/opensearch/data
+    restart: unless-stopped
+
+volumes:
+  opensearch-data:
