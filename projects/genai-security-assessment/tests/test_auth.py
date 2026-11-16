@@ -50,7 +50,7 @@ def test_admin_can_access_confidential():
 def test_user_key_applies_user_role(monkeypatch):
     captured = {}
 
-    def fake_search(question, role):
+    def fake_search(question, role, max_distance=None):
         captured["role"] = role
         return ["테스트용 공개 정책"]
 
@@ -74,7 +74,7 @@ def test_user_key_applies_user_role(monkeypatch):
 def test_admin_key_applies_admin_role(monkeypatch):
     captured = {}
 
-    def fake_search(question, role):
+    def fake_search(question, role, max_distance=None):
         captured["role"] = role
         return ["테스트용 기밀 정책"]
 
@@ -102,7 +102,7 @@ def test_admin_key_applies_admin_role(monkeypatch):
 #def test_user_cannot_escalate_role(monkeypatch):
 
 def test_user_cannot_escalate_role(monkeypatch):
-    def fake_search(question, role):
+    def fake_search(question, role, max_distance=None):
         raise AssertionError(
             "권한 상승 의심 요청에서 문서 검색이 실행되면 안 됩니다."
         )

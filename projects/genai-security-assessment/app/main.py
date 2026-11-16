@@ -60,13 +60,25 @@ def chat(
     url = "http://localhost:11434/api/chat"
 
 
+    
     documents = search_documents(
-    request.question,
-    role=current_user["role"]
-    )   
+        request.question,
+        role=current_user["role"],
+        max_distance=0.5
+    )
 
-    #print("검색된 문서:", documents)  # ← 이 줄만 추가!
+    # 검색된 문서가 없으면 LLM 호출 없이 응답 제한
+    if not documents:
+        logger.warning(
+            "RAG_GROUNDING_FAILURE reason=NO_DOCUMENTS"
+        )
+
+        return {
+            "answer": "회사 정책 문서에서 관련 정보를 찾을 수 없습니다."
+        }
+
     document = "\n\n".join(documents)
+
 
     data = {
         "model": "qwen2.5:1.5b",

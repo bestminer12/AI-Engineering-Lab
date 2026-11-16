@@ -62,8 +62,13 @@ def index_documents():
 
 
 
-def search_documents(question: str, role: str = "USER"):
 
+def search_documents(
+    question: str,
+    role: str = "USER",
+    max_distance: float | None = None
+):
+    # 1. 사용자 권한별 문서 접근통제
     if role == "USER":
         where_filter = {
             "$and": [
@@ -78,17 +83,25 @@ def search_documents(question: str, role: str = "USER"):
     else:
         raise ValueError("Invalid role")
 
-    query_args = {
-        "query_texts": [question],
-        "n_results": 5
-    }
+    # 2. ChromaDB 검색
+    results = collection.query(
+        query_texts=[question],
+        n_results=5,
+        where=where_filter,
+        include=["documents", "distances"]
+    )
 
-    if where_filter is not None:
-        query_args["where"] = where_filter
+    documents = results["documents"][0]
+    distances = results["distances"][0]
 
-    results = collection.query(**query_args)
+    # 3. 관련성 점수 기반 필터링
+    filtered_documents = []
 
-    return results["documents"][0]
+    for document, distance in zip(documents, distances):
+        if max_distance is None or distance <= max_distance:
+            filtered_documents.append(document)
+
+    return filtered_documents
 
 
 
