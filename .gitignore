@@ -13,6 +13,8 @@ __pycache__/
 !.env.example
 *.pem
 *.key
+local-backup/
+.vscode/
 
 # Local databases
 *.db
@@ -23,3 +25,12 @@ __pycache__/
 # ChromaDB
 chroma_db/
 chroma_data/
+
+# Security logs
+logs/
+
+# SQLite alert history
+*.db
+*.db-journal
+*.db-shm
+*.db-wal
