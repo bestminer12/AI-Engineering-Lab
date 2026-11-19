@@ -4,6 +4,8 @@ import os
 import requests
 from dotenv import load_dotenv
 
+from security.sensitive_data_filter import mask_sensitive_data
+
 
 load_dotenv()
 
@@ -26,6 +28,7 @@ def send_slack_alert(assessment: dict) -> bool:
     reasons = assessment.get("reasons", [])
     evidence_count = assessment.get("verified_evidence_count", 0)
 
+    # 1. Slack 메시지 생성
     message = {
         "text": (
             f"🚨 SOC Security Alert\n"
@@ -38,9 +41,13 @@ def send_slack_alert(assessment: dict) -> bool:
         )
     }
 
+    # 2. Slack 전송 전 민감정보 마스킹
+    safe_message = mask_sensitive_data(message)
+
+    # 3. 마스킹된 메시지만 Slack으로 전송
     response = requests.post(
         webhook_url,
-        json=message,
+        json=safe_message,
         timeout=10,
     )
     response.raise_for_status()

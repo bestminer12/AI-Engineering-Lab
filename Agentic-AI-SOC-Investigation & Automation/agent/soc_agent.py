@@ -3,14 +3,21 @@ import json
 import sys
 from pathlib import Path
 
+
+from typing import Annotated, TypedDict
+from langgraph.graph.message import add_messages
+
 from langchain_ollama import ChatOllama
 from langchain_core.tools import tool
-from langchain_core.messages import HumanMessage, SystemMessage
+from langchain_core.messages import HumanMessage, SystemMessage, ToolMessage
 from langgraph.graph import StateGraph, START, END, MessagesState
 from langgraph.prebuilt import ToolNode, tools_condition
 
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
+
+from security.sensitive_data_filter import mask_sensitive_data
+
 
 from tools.generate_investigation_report import (
     generate_investigation_report as create_report,
@@ -26,24 +33,61 @@ END_TIME = "2026-11-17T01:00:00Z"
 
 # Lab safety limits
 MAX_TOOL_CALLS = 4
-tool_call_count = 0
 
+class SOCState(TypedDict):
+    messages: Annotated[list, add_messages]
+    tool_call_count: int
+
+
+def sanitize_security_logs(results):
+    """Keep only approved security event fields."""
+
+    allowed_fields = {
+        "@timestamp",
+        "timestamp",
+        "event_id",
+        "event",
+        "user",
+        "user_name",
+        "source",
+        "source_ip",
+        "outcome",
+        "action",
+    }
+
+    nested_allowed_fields = {
+        "event": {"action", "outcome", "category", "type"},
+        "user": {"name"},
+        "source": {"ip"},
+    }
+
+    def sanitize(value, parent=None):
+        if isinstance(value, list):
+            return [sanitize(item, parent) for item in value]
+
+        if isinstance(value, dict):
+            permitted = nested_allowed_fields.get(parent, allowed_fields)
+
+            return {
+                key: sanitize(item, key)
+                for key, item in value.items()
+                if key in permitted
+            }
+
+        return value
+
+    return sanitize(results)
 
 @tool
 def search_security_logs(user_name: str) -> str:
     """Search individual security events for a user."""
-
-    global tool_call_count
-    tool_call_count += 1
-
-    if tool_call_count > MAX_TOOL_CALLS:
-        return json.dumps({"error": "Tool call limit exceeded"})
 
     if not user_name or not user_name.strip():
         return json.dumps({"error": "Invalid user_name"})
 
     print(f"[TOOL EXECUTED] search_security_logs: {user_name}")
 
+    # 1. OpenSearch에서 로그 조회
     results = query_logs(
         user_name=user_name,
         start_time=START_TIME,
@@ -51,8 +95,24 @@ def search_security_logs(user_name: str) -> str:
         size=20,
     )
 
-    return json.dumps(results, ensure_ascii=False)
+    # 1. 허용된 로그 필드만 선택
+    safe_results = sanitize_security_logs(results)
 
+    # 2. 남아 있는 민감정보 마스킹
+    safe_results = mask_sensitive_data(safe_results)
+
+    # 3. 필터링된 로그 확인 (테스트용)
+    print(
+        "[SANITIZED LOGS]",
+        json.dumps(
+            safe_results[:2] if isinstance(safe_results, list) else safe_results,
+            ensure_ascii=False,
+            indent=2,
+        ),
+    )
+
+    # 4. 필터링된 결과를 LangGraph에 반환
+    return json.dumps(safe_results, ensure_ascii=False)
 
 @tool
 def aggregate_auth_failures(user_name: str) -> str:
@@ -153,34 +213,85 @@ tools = [
 llm_with_tools = llm.bind_tools(tools)
 
 
-def agent_node(state: MessagesState):
+def agent_node(state: SOCState):
     response = llm_with_tools.invoke(state["messages"])
     return {"messages": [response]}
 
 
-graph = StateGraph(MessagesState)
+def tool_node_with_limit(state: SOCState):
+    last_message = state["messages"][-1]
+    requested_calls = len(last_message.tool_calls)
+
+    current_count = state.get("tool_call_count", 0)
+
+    if current_count + requested_calls > MAX_TOOL_CALLS:
+        print("[BLOCKED] Tool call limit exceeded")
+
+        return {
+            "messages": [
+                ToolMessage(
+                    content="Tool call limit exceeded",
+                    tool_call_id=call["id"],
+                    name=call["name"],
+                    status="error",
+                )
+                for call in last_message.tool_calls
+            ],
+            "tool_call_count": current_count,
+        }
+
+    result = ToolNode(tools).invoke({
+        "messages": state["messages"]
+    })
+
+    return {
+        "messages": result["messages"],
+        "tool_call_count": current_count + requested_calls,
+    }
+
+
+def route_after_agent(state: SOCState):
+    last_message = state["messages"][-1]
+
+    if not last_message.tool_calls:
+        return END
+
+    if state.get("tool_call_count", 0) >= MAX_TOOL_CALLS:
+        return "limit_reached"
+
+    return "tools"
+
+
+def limit_reached_node(state: SOCState):
+    print("[BLOCKED] Maximum tool calls reached")
+    return {}
+
+
+graph = StateGraph(SOCState)
 
 graph.add_node("agent", agent_node)
-graph.add_node("tools", ToolNode(tools))
+graph.add_node("tools", tool_node_with_limit)
+graph.add_node("limit_reached", limit_reached_node)
 
 graph.add_edge(START, "agent")
 
 graph.add_conditional_edges(
     "agent",
-    tools_condition,
+    route_after_agent,
     {
         "tools": "tools",
-        "__end__": END,
+        "limit_reached": "limit_reached",
+        END: END,
     },
 )
 
 graph.add_edge("tools", "agent")
+graph.add_edge("limit_reached", END)
 
 app = graph.compile()
 
 
 if __name__ == "__main__":
-    tool_call_count = 0
 
     result = app.invoke(
         {
@@ -198,17 +309,22 @@ if __name__ == "__main__":
                 HumanMessage(
                     content=(
                         "Investigate user alice. "
-                        "Count failed login attempts, "
-                        "check for suspicious authentication correlations, "
-                        "and build an event timeline. "
-                        "Use the appropriate tools."
+                        "Use search_security_logs to retrieve her security events."
                     )
                 ),
-            ]
+            ],
+            "tool_call_count": 0,
         },
         config={"recursion_limit": 12},
     )
 
+    print("\n=== Tool Call Limit Verification ===")
+    print("Executed tool calls:", result["tool_call_count"])
+    print("Maximum allowed:", MAX_TOOL_CALLS)
+
+    assert result["tool_call_count"] <= MAX_TOOL_CALLS
+
+    print("[PASS] Tool call count within limit")
     print("\n=== Execution History ===")
 
     for message in result["messages"]:
