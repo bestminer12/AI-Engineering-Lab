@@ -187,6 +187,8 @@ def build_event_timeline(user_name: str) -> str:
 llm = ChatOllama(
     model="qwen2.5:1.5b",
     temperature=0,
+    base_url="http://localhost:11434",
+    client_kwargs={"timeout": 120.0},
 )
 
 tools = [
@@ -286,7 +288,7 @@ graph.add_edge("limit_reached", END)
 app = graph.compile()
 
 
-if __name__ == "__main__":
+def main():
     benchmark_start = time.perf_counter()
 
     result = app.invoke(
@@ -375,3 +377,18 @@ if __name__ == "__main__":
 
     print("\n=== Agent Benchmark Results ===")
     print(f"Total elapsed: {benchmark_elapsed:.2f}s")
+
+if __name__ == "__main__":
+    try:
+        main()
+
+    except Exception as exc:
+        print(
+            f"[ERROR] Agent execution failed: {type(exc).__name__}: {exc}",
+            flush=True,
+        )
+        print(
+            "[ABORTED] Agent investigation stopped.",
+            flush=True,
+        )
+        raise SystemExit(1)

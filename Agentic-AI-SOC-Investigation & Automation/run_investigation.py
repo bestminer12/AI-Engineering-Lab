@@ -1,5 +1,6 @@
 
 import json
+import sys
 
 from tools.correlate_auth_events import correlate_auth_events
 from tools.build_event_timeline import build_event_timeline
@@ -109,6 +110,17 @@ def run_investigation(
         print(f"[FAILED] Slack delivery: {type(exc).__name__}")
         raise
 
-
 if __name__ == "__main__":
-    run_investigation()
+    try:
+        run_investigation()
+
+    except Exception as exc:
+        print(
+            f"[ERROR] Investigation failed: {type(exc).__name__}: {exc}",
+            file=sys.stderr,
+        )
+        print(
+            "[ABORTED] Investigation pipeline stopped.",
+            file=sys.stderr,
+        )
+        sys.exit(1)
