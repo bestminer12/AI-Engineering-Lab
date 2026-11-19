@@ -1,305 +1,401 @@
-# Agentic AI SOC Investigation & Alert Automation Lab
+# Agentic AI SOC Investigation & Alert Automation
 
-**An Agentic AI-based security investigation and alert automation project for SOC environments.**
+**A security investigation and alert automation lab using LangGraph, Ollama, OpenSearch, and Python.**
 
 ## 1. Project Overview
 
-This project aims to design, implement, and evaluate an AI agent capable of performing multi-step security investigations using structured security logs.
+This project implements an Agent-assisted Security Operations Center (SOC) investigation workflow for analyzing suspicious authentication activity.
 
-Traditional SOC investigations often require analysts to execute multiple searches, correlate related events, reconstruct attack timelines, and assess potential security incidents.
+Traditional SOC investigations require analysts to search logs, correlate events, reconstruct timelines, assess incident severity, and determine whether an alert should be issued.
 
-This project explores whether an Agentic AI approach can improve investigation efficiency by coordinating these activities through controlled, read-only tools.
+The project explores how an LLM-based agent can coordinate investigation tools while deterministic Python logic handles evidence verification, severity classification, and notification control.
 
-The system is designed to support security analysts rather than replace human judgment.
+**The goal is to assist security analysts, not replace human judgment.**
 
-**Project Status:** Planning / Development Preparation
+**Project Status:** Core implementation and planned validation completed (Phases 1–7). Portfolio documentation in progress (Phase 8).
 
 ## 2. Project Objectives
 
-- Implement an Agentic AI workflow for multi-step security investigations.
-- Integrate OpenSearch for security log retrieval and correlation.
-- Generate structured investigation reports supported by log evidence.
-- Apply deterministic severity classification using server-side rules.
-- Deliver validated HIGH and CRITICAL alerts through Slack.
-- Implement security controls to restrict agent behavior and tool execution.
-- Evaluate investigation accuracy, processing time, and operational efficiency against conventional approaches.
+- Implement multi-step security investigations using LangGraph.
+- Retrieve and correlate security events stored in OpenSearch.
+- Generate evidence-based investigation reports.
+- Separate LLM-generated analysis from verified security findings.
+- Classify severity using deterministic Python rules.
+- Deliver Slack security alerts with duplicate suppression.
+- Apply tool restrictions, prompt-injection safeguards, and sensitive-data masking.
+- Compare manual investigation, single-LLM analysis, and Agent-assisted investigation.
 
 ## 3. Technology Stack
 
-| Component | Technology |
-|---|---|
-| Programming Language | Python 3.11 |
-| Development Environment | Windows 11 |
-| API Framework | FastAPI |
-| Agent Orchestration | LangGraph |
-| Local LLM Runtime | Ollama |
-| LLM Model | To be determined |
-| Search Engine | OpenSearch |
-| Log Format | ECS-like JSON |
-| Data Validation | Pydantic |
-| State Management | SQLite |
-| Alert Delivery | Slack Incoming Webhook |
-| Automated Testing | pytest |
-| Infrastructure | Docker Compose |
-| Version Control | Git / GitHub |
+| Component | Technology | Purpose |
+|---|---|---|
+| Programming Language | Python 3.11 | Investigation and automation logic |
+| Development Environment | Windows / VS Code | Local development |
+| Agent Orchestration | LangGraph | Agent workflow and tool execution |
+| Local LLM Runtime | Ollama | Local LLM inference |
+| LLM Model | Qwen2.5 1.5B | Tool selection and investigation summaries |
+| Search Engine | OpenSearch 2.19.4 | Security log storage and retrieval |
+| Log Format | JSON | Synthetic security events |
+| Severity Engine | Python | Rule-based severity classification |
+| State Storage | SQLite | Alert history and duplicate suppression |
+| Notifications | Slack Incoming Webhook | Security alert delivery |
+| Infrastructure | Docker / Docker Compose | Local OpenSearch environment |
+| Version Control | Git / GitHub | Source code management |
+
+The implemented workflow uses Python scripts and a command-line interface. **FastAPI is not part of this project's investigation architecture.**
 
 ## 4. System Architecture
 
 ```text
-[Security Analyst]
-        |
-        | Natural Language Investigation Request
-        v
-[FastAPI]
-        |
-        v
-[LangGraph Investigation Agent]
-        |
-        +-- Tool Selection
-        +-- Investigation Planning
-        +-- Multi-Step Correlation
-        |
-        v
-[Approved Read-Only Tools]
-        |
-        +-- search_security_logs
-        +-- aggregate_auth_failures
-        +-- correlate_auth_events
-        +-- build_event_timeline
-        |
-        v
-[OpenSearch]
-        |
-        v
-[Security Log Evidence]
-        |
-        v
-[Investigation Report]
-        |
-        +-- Evidence Validation
-        +-- Event Timeline
-        +-- Investigation Findings
-        |
-        v
-[Deterministic Severity Engine]
-        |
-        +-- LOW
-        +-- MEDIUM
-        +-- HIGH
-        +-- CRITICAL
-        |
-        +-- LOW / MEDIUM --> Report Only
-        |
-        +-- HIGH / CRITICAL
-                    |
-                    v
-             [Alert Validation]
-                    |
-                    v
-              [Slack Webhook]
-                    |
-                    v
-             [Security Analyst]
+[Security Analyst / Investigation Request]
+                  |
+                  v
+       [LangGraph SOC Agent]
+                  |
+                  +---- [Ollama / Qwen2.5]
+                  |        Tool selection
+                  |        Investigation summary
+                  |
+                  v
+        [Approved Python Tools]
+                  |
+                  +-- search_security_logs
+                  +-- aggregate_auth_failures
+                  +-- correlate_auth_events
+                  +-- build_event_timeline
+                  |
+                  v
+             [OpenSearch]
+                  |
+                  v
+          [Security Log Events]
+                  |
+                  v
+       [Evidence Verification]
+                  |
+                  v
+      [Verified Investigation Report]
+                  |
+                  v
+       [Python Severity Engine]
+                  |
+                  v
+       [Incident Identification]
+                  |
+                  v
+       [SQLite Duplicate Check]
+                  |
+                  v
+        [Slack Notification]
+                  |
+                  v
+          [Security Analyst]
 ```
 
-The LLM is responsible for investigation planning and tool orchestration.
+### Design Principles
 
-Security-sensitive decisions, including severity classification and alert delivery, are controlled by server-side logic.
+**LLM responsibilities**
+- Interpret investigation requests.
+- Select approved investigation tools.
+- Produce natural-language investigation summaries.
 
-## 5. Core Investigation Capabilities
+**Python responsibilities**
+- Retrieve and correlate security events.
+- Construct evidence-based reports.
+- Apply deterministic severity rules.
+- Identify incidents and suppress duplicate alerts.
+- Control notification delivery.
 
-### 5.1 Security Log Search
+The LLM's generated summary is not treated as authoritative evidence. Security-sensitive decisions are handled by deterministic application logic.
 
-Retrieve relevant security events from OpenSearch using approved read-only tools.
+The repository also provides a standalone investigation pipeline through `run_investigation.py`.
 
-### 5.2 Authentication Failure Analysis
+## 5. Investigation Scenario
 
-Identify repeated authentication failures and aggregate events by relevant attributes.
+The primary scenario uses synthetic authentication and privilege-related events for the account `alice`.
 
-### 5.3 Event Correlation
+### Test Scenario
 
-Correlate related authentication events, including failure-to-success patterns and suspicious activity involving multiple IP addresses.
+- Eight failed authentication attempts.
+- One successful authentication following the failures.
+- One privilege-change event.
 
-### 5.4 Attack Timeline Reconstruction
+### Verified Investigation Results
 
-Organize correlated security events into a chronological timeline.
-
-### 5.5 Evidence-Based Investigation Reports
-
-Generate structured investigation reports containing findings, supporting log evidence, and event timelines.
-
-### 5.6 Deterministic Severity Classification
-
-Classify investigation results using predefined server-side rules.
-
-Supported severity levels:
-
-- LOW
-- MEDIUM
-- HIGH
-- CRITICAL
-
-The LLM does not independently determine the final severity level.
-
-### 5.7 Slack Alert Automation
-
-Deliver validated HIGH and CRITICAL alerts to Slack.
-
-Alert delivery is controlled by server-side validation, deduplication, and delivery-state management.
-
-## 6. Security Design
-
-Security controls are an essential part of the project.
-
-### 6.1 Read-Only Tool Access
-
-The agent can access only explicitly approved investigation tools.
-
-Direct modification of security logs and unrestricted command execution are outside the permitted workflow.
-
-### 6.2 Query Restrictions
-
-OpenSearch operations are subject to restrictions on:
-
-- Allowed indices
-- Query time ranges
-- Searchable fields
-- Result counts
-- Tool invocation limits
-- Execution timeouts
-
-### 6.3 Prompt Injection Defense
-
-The project includes test scenarios involving malicious instructions embedded in investigation inputs and retrieved data.
-
-Agent behavior must remain within predefined tool and workflow boundaries.
-
-### 6.4 Evidence Validation
-
-Investigation findings must be supported by identifiable security log evidence.
-
-### 6.5 Sensitive Data Protection
-
-Report and alert outputs are subject to field allowlisting and sensitive-data masking.
-
-### 6.6 Alert Delivery Protection
-
-The LLM cannot directly invoke Slack webhooks.
-
-Alert delivery is handled by server-side logic with validation, deduplication, and retry handling.
-
-### 6.7 Audit Logging
-
-Agent actions, tool execution, investigation results, and alert delivery events are recorded for traceability.
-
-## 7. Planned Security Investigation Scenarios
-
-The evaluation will include the following scenarios:
-
-| Scenario | Description |
+| Metric | Result |
 |---|---|
-| Repeated Authentication Failures | Detect and investigate repeated failed login attempts |
-| Failure-to-Success Correlation | Identify successful authentication following repeated failures |
-| Multi-IP Activity | Correlate suspicious authentication events across multiple source IPs |
-| Privilege Escalation | Investigate suspicious privilege-related events |
-| Alert Delivery | Validate HIGH / CRITICAL Slack notifications |
-| Delivery Failure | Verify handling of Slack delivery failures |
-| Prompt Injection | Evaluate resistance to malicious instructions |
-| Unauthorized Tool Access | Verify rejection of unapproved tool execution |
-| Sensitive Data Leakage | Verify output filtering and masking |
-| Agent Loop | Verify execution limits and termination behavior |
-| Alert Flooding | Verify deduplication and alert delivery controls |
+| Timeline events | 10 |
+| Verified evidence events | 9 |
+| Verified investigation findings | 1 |
+| Key verified finding | Failure-to-success authentication pattern |
+| Final severity | CRITICAL |
+| Analyst review required | Yes |
 
-All security logs used in this project will be synthetic.
+The severity engine identifies the failure-to-success pattern and the privilege-change event as reasons for a CRITICAL assessment.
 
-## 8. Evaluation Methodology
+This severity is assigned by Python rules, not independently by the LLM.
 
-A primary objective of this project is to evaluate whether Agentic AI provides measurable benefits over conventional security investigation approaches.
+## 6. Core Investigation Capabilities
 
-The same security log datasets and investigation scenarios will be used for comparison.
+### 6.1 Security Log Search
 
-### 8.1 Investigation Approaches
+`search_security_logs` retrieves security events from OpenSearch using supported filters.
 
-| Approach | Description |
+### 6.2 Authentication Failure Aggregation
+
+`aggregate_auth_failures` summarizes failed authentication activity to support investigation of repeated login attempts.
+
+### 6.3 Event Correlation
+
+`correlate_auth_events` analyzes relationships between authentication events, including suspicious failure-to-success sequences.
+
+### 6.4 Event Timeline Reconstruction
+
+`build_event_timeline` organizes relevant events chronologically to help analysts understand the investigation sequence.
+
+### 6.5 Verified Investigation Reporting
+
+The Python investigation pipeline generates structured reports with findings, event timelines, and supporting evidence.
+
+### 6.6 Deterministic Severity Classification
+
+The severity engine uses predefined Python rules rather than relying solely on LLM-generated assessments.
+
+### 6.7 Slack Alert Automation
+
+The notification pipeline uses incident identification, SQLite alert history, duplicate suppression, and sensitive-data filtering.
+
+A repeated investigation of the same incident was verified to skip duplicate notification delivery.
+
+## 7. Agent Security Controls
+
+Security restrictions are applied to reduce the risks of integrating LLMs with investigation tools.
+
+### 7.1 Tool Allowlist
+
+The Agent is restricted to four approved investigation tools:
+
+1. `search_security_logs`
+2. `aggregate_auth_failures`
+3. `correlate_auth_events`
+4. `build_event_timeline`
+
+A test using an unauthorized tool name, `delete_security_logs`, confirmed that the tool was rejected.
+
+### 7.2 Tool Invocation Limit
+
+The Agent has a maximum tool-call count of four.
+
+Testing confirmed that a fifth tool call was blocked.
+
+### 7.3 Prompt Injection Safeguards
+
+Security log content is treated as untrusted investigation data.
+
+A test inserted a malicious instruction attempting to convince the LLM that suspicious authentication activity was normal.
+
+The tested LLM response did not follow that malicious instruction.
+
+This result demonstrates resistance to the tested scenario only. It does not establish comprehensive prompt-injection protection.
+
+### 7.4 Sensitive Data Masking
+
+The project includes filtering for sensitive values such as:
+
+- Passwords
+- API keys
+- Bearer tokens
+- Access tokens
+
+Tests confirmed that these values were replaced with `[REDACTED]`.
+
+### 7.5 Slack Output Protection
+
+A Slack masking test verified that sensitive values were removed from the outgoing alert payload.
+
+### 7.6 Failure Handling
+
+The command-line investigation and Agent entry points include exception handling for execution failures.
+
+Connection-failure tests confirmed concise error reporting and pipeline termination when OpenSearch or Ollama was unavailable.
+
+## 8. Performance Evaluation
+
+Three investigation approaches were evaluated against the project's synthetic authentication scenario.
+
+### 8.1 Measured Investigation Time
+
+| Approach | Execution Time | Relative to Manual |
+|---|---:|---:|
+| Manual SOC investigation | 600.00 seconds | Baseline |
+| Single LLM | 28.50 seconds | Approximately 21.1× faster |
+| Agent-assisted pipeline | 57.10 seconds | Approximately 10.5× faster |
+
+**The manual investigation time was measured through an actual manual investigation run, not estimated.**
+
+### 8.2 Single-LLM Results
+
+- Execution time: 28.50 seconds.
+- Input tokens: 744.
+- Output tokens: 173.
+- Total tokens: 917.
+- Correctly identified the four evaluated event/pattern criteria.
+- Produced a MEDIUM severity assessment.
+
+### 8.3 Agent-Assisted Pipeline Results
+
+- Execution time: 57.10 seconds.
+- Used LangGraph and approved investigation tools.
+- Produced a verified investigation report.
+- Identified 10 timeline events and 9 verified evidence events.
+- Assigned CRITICAL severity through deterministic Python rules.
+- Included incident identification and Slack duplicate-notification handling.
+
+### 8.4 Interpretation
+
+The single-LLM approach was faster than the Agent-assisted pipeline.
+
+However, the Agent-assisted pipeline covered additional investigation and operational steps, including tool orchestration, evidence verification, deterministic severity assessment, and alert handling.
+
+The difference between MEDIUM and CRITICAL severity demonstrates the importance of separating generative analysis from deterministic security decisions. It does not prove that the Agent's LLM is inherently more accurate.
+
+**Evaluation limitations:**
+
+- Results represent individual measured runs rather than repeated statistical benchmarks.
+- The three approaches did not perform identical workloads.
+- Execution times depend on local hardware, model inference performance, and workflow scope.
+- Broader accuracy, false-positive, and false-negative rates were not established.
+
+## 9. Integration and Reliability Testing
+
+| Test | Result |
 |---|---|
-| Baseline A | Manual security investigation |
-| Baseline B | Single-step natural-language-to-query investigation |
-| Proposed | Agentic AI-based multi-step investigation |
-| Extended | Agentic investigation with automated Slack alerting |
+| End-to-end Python investigation pipeline | PASS |
+| Tool-call limit enforcement | PASS |
+| Unauthorized tool rejection | PASS |
+| Tested prompt-injection scenario | PASS |
+| Sensitive-data masking | PASS |
+| Slack payload masking | PASS |
+| Duplicate alert suppression | PASS |
+| OpenSearch connection-failure handling | PASS |
+| Ollama connection-failure handling | PASS |
+| Ollama request timeout configuration | Configured; behavior not empirically tested |
 
-### 8.2 Evaluation Metrics
+### Reliability Notes
 
-- Investigation time
-- Investigation accuracy
-- Evidence identification accuracy
-- Tool invocation count
-- Search query execution count
-- False positives and false negatives
-- Alert precision and recall
-- Alert delivery latency
+- OpenSearch connection failures terminate the CLI investigation pipeline with error messages.
+- Ollama connection failures terminate the Agent CLI with error messages.
+- A 120-second timeout is configured for the Ollama client, but an actual delayed-response timeout test has not been completed.
+- Full Agent recovery after a simulated dependency failure has not been verified.
 
-### 8.3 Evaluation Principles
+These tests validate the specified scenarios; they are not a comprehensive production reliability assessment.
 
-- Use consistent datasets and scenarios across approaches.
-- Repeat measurements where applicable.
-- Validate investigation findings against predefined expected results.
-- Analyze both successful and unsuccessful investigation outcomes.
-- Report measured results without assuming performance improvements in advance.
+## 10. Project Structure
 
-The project does not assume that an AI agent will outperform conventional approaches in every scenario.
+```text
+.
+├── agent/                    # LangGraph Agent and safety tests
+├── alerts/                   # Slack notifications and alert history
+├── data/                     # Synthetic security log data
+├── security/                 # Sensitive-data filtering
+├── severity/                 # Deterministic severity rules
+├── tools/                    # OpenSearch investigation tools
+├── benchmark_single_llm.py  # Single-LLM benchmark
+├── docker-compose.yml       # Local OpenSearch environment
+├── requirements.txt         # Python dependencies
+├── run_investigation.py     # Standalone investigation pipeline
+└── README.md
+```
 
-Simple investigations may be more efficiently handled by traditional searches or deterministic automation.
+## 11. Running the Project
 
-The evaluation will identify the conditions under which multi-step agentic investigation provides practical benefits.
+### Prerequisites
 
-## 9. Development Roadmap
+- Python 3.11
+- Docker
+- Ollama
+- Qwen2.5 1.5B model
+- Python dependencies listed in `requirements.txt`
+- Slack Incoming Webhook for notification testing
+
+### Install Dependencies
+
+```bash
+pip install -r requirements.txt
+```
+
+### Start OpenSearch
+
+```bash
+docker compose up -d
+```
+
+### Prepare the Local LLM
+
+```bash
+ollama pull qwen2.5:1.5b
+```
+
+Ensure that Ollama is running and accessible through the configured local endpoint.
+
+### Run the Investigation Pipeline
+
+```bash
+python -u run_investigation.py
+```
+
+### Run the Agent
+
+```bash
+python -u agent/soc_agent.py
+```
+
+### Run the Single-LLM Benchmark
+
+```bash
+python -u benchmark_single_llm.py
+```
+
+**Important:** OpenSearch must contain the required synthetic security events before an investigation is executed. Slack notification tests additionally require a valid webhook configuration.
+
+## 12. Development Roadmap
 
 | Phase | Description | Status |
 |---|---|---|
-| Phase 1 | Infrastructure and development environment setup | Planned |
-| Phase 2 | OpenSearch integration and investigation tools | Planned |
-| Phase 3 | LangGraph agent workflow | Planned |
-| Phase 4 | Evidence-based investigation reporting | Planned |
-| Phase 5 | Deterministic severity classification and Slack integration | Planned |
-| Phase 6 | Agent security controls and adversarial testing | Planned |
-| Phase 7 | Quantitative evaluation and baseline comparison | Planned |
-| Phase 8 | Documentation and GitHub portfolio finalization | Planned |
+| Phase 1 | OpenSearch environment and log ingestion | Completed |
+| Phase 2 | Log investigation tools, correlation, and timelines | Completed |
+| Phase 3 | Ollama and LangGraph Agent integration | Completed |
+| Phase 4 | Severity classification and Slack alert automation | Completed |
+| Phase 5 | Agent security controls | Completed |
+| Phase 6 | End-to-end integration and benchmark evaluation | Completed |
+| Phase 7 | Security, integration, and reliability validation | Completed |
+| Phase 8 | Documentation and GitHub portfolio finalization | In Progress |
 
-## 10. Expected Deliverables
+## 13. Limitations
 
-The project aims to produce:
+This project is a controlled laboratory implementation, not a production SOC platform.
 
-1. A functional Agentic AI security investigation workflow.
-2. A synthetic security log dataset and reproducible investigation scenarios.
-3. Approved OpenSearch investigation tools.
-4. Evidence-based investigation reports.
-5. Deterministic severity classification and Slack alert delivery.
-6. Automated functional and security tests.
-7. Quantitative comparisons with conventional investigation methods.
-8. A final technical assessment report documenting results and limitations.
+Current limitations include:
 
-## 11. Project Scope and Limitations
+- Synthetic rather than production security logs.
+- A limited number of investigation scenarios.
+- Local, CPU-based LLM inference.
+- Single-run performance measurements.
+- Limited prompt-injection test coverage.
+- No comprehensive accuracy or alert precision/recall evaluation.
+- No empirically verified delayed-response timeout behavior.
+- No demonstrated production-scale concurrency or high availability.
 
-This project is a laboratory implementation intended for security engineering research and portfolio demonstration.
+Future work could explore additional attack scenarios, larger datasets, repeated benchmarks, and integration with production-grade LLM services and SIEM environments.
 
-It is not a production SOC platform.
+These improvements are outside the scope of the current implementation.
 
-The project uses synthetic security logs and controlled investigation scenarios.
+## 14. Conclusion
 
-Investigation accuracy, performance improvements, and operational suitability will be assessed after implementation and testing.
+This project demonstrates a practical approach to combining Agentic AI with deterministic security investigation and alert automation.
 
-No performance or security guarantees are claimed before validation.
+The main engineering lesson is that **LLMs are useful for investigation orchestration and summarization, but security decisions should remain grounded in verified evidence and controlled application logic.**
 
-## 12. Conclusion
+The benchmark also shows that an Agent-assisted workflow is not necessarily faster than a simpler LLM approach. Its potential value lies in coordinating multi-step investigation, verification, and operational controls.
 
-The Agentic AI SOC Investigation & Alert Automation Lab explores the practical application of AI agents to security investigation workflows.
-
-Its primary goal is not simply to demonstrate an AI agent, but to evaluate whether controlled, multi-step agentic investigation can provide measurable value in SOC operations.
-
-The final assessment will consider investigation accuracy, efficiency, evidence quality, security controls, and operational limitations.
-
-**The project will prioritize measurable engineering outcomes over feature expansion.**
-
----
-
-**Project Status: Planned — Implementation and evaluation pending.**
+The project prioritizes measurable implementation results, security boundaries, and clearly documented limitations over unnecessary feature expansion.
