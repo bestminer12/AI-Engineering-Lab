@@ -2,6 +2,7 @@
 import json
 import sys
 from pathlib import Path
+import time
 
 
 from typing import Annotated, TypedDict
@@ -17,7 +18,7 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 sys.path.insert(0, str(PROJECT_ROOT))
 
 from security.sensitive_data_filter import mask_sensitive_data
-
+from run_investigation import run_investigation
 
 from tools.generate_investigation_report import (
     generate_investigation_report as create_report,
@@ -118,11 +119,6 @@ def search_security_logs(user_name: str) -> str:
 def aggregate_auth_failures(user_name: str) -> str:
     """Count failed login attempts for a user."""
 
-    global tool_call_count
-    tool_call_count += 1
-
-    if tool_call_count > MAX_TOOL_CALLS:
-        return json.dumps({"error": "Tool call limit exceeded"})
 
     if not user_name or not user_name.strip():
         return json.dumps({"error": "Invalid user_name"})
@@ -147,11 +143,6 @@ def aggregate_auth_failures(user_name: str) -> str:
 def correlate_auth_events(user_name: str) -> str:
     """Find suspicious authentication correlations for a user."""
 
-    global tool_call_count
-    tool_call_count += 1
-
-    if tool_call_count > MAX_TOOL_CALLS:
-        return json.dumps({"error": "Tool call limit exceeded"})
 
     if not user_name or not user_name.strip():
         return json.dumps({"error": "Invalid user_name"})
@@ -177,11 +168,6 @@ def correlate_auth_events(user_name: str) -> str:
 def build_event_timeline(user_name: str) -> str:
     """Build a chronological security event timeline for a user."""
 
-    global tool_call_count
-    tool_call_count += 1
-
-    if tool_call_count > MAX_TOOL_CALLS:
-        return json.dumps({"error": "Tool call limit exceeded"})
 
     if not user_name or not user_name.strip():
         return json.dumps({"error": "Invalid user_name"})
@@ -214,7 +200,16 @@ llm_with_tools = llm.bind_tools(tools)
 
 
 def agent_node(state: SOCState):
+    print("[DEBUG] Ollama request started", flush=True)
+
+    start = time.perf_counter()
+
     response = llm_with_tools.invoke(state["messages"])
+
+    elapsed = time.perf_counter() - start
+
+    print(f"[DEBUG] Ollama response received: {elapsed:.2f}s", flush=True)
+
     return {"messages": [response]}
 
 
@@ -292,6 +287,7 @@ app = graph.compile()
 
 
 if __name__ == "__main__":
+    benchmark_start = time.perf_counter()
 
     result = app.invoke(
         {
@@ -371,3 +367,11 @@ if __name__ == "__main__":
     print("Investigation user:", report.get("investigation", {}).get("user"))
     print("Summary:", report.get("summary"))
 
+    # Phase 6-3: Automated Investigation & Alert Pipeline
+    print("\n=== Automated Investigation & Alert Pipeline ===")
+    run_investigation(user_name="alice", report=report)
+
+    benchmark_elapsed = time.perf_counter() - benchmark_start
+
+    print("\n=== Agent Benchmark Results ===")
+    print(f"Total elapsed: {benchmark_elapsed:.2f}s")
